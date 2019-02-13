@@ -1,5 +1,6 @@
 from room import Room
 from player import Player
+from action import Action
 
 # Declare all the rooms
 
@@ -42,8 +43,21 @@ room['treasure'].s_to = room['narrow']
 player = Player(name='John', loc=room['outside'])
 # Write a loop that:
 game_on = True
+
+
+def end_game():
+    global game_on
+    game_on = False
+    return 'Game ended. Goodbye'
+
+
+quit = Action(key='q', desc='End game', act=end_game)
+
 while game_on:
     choices = player.situation()
+    choices['q'] = quit
+    for key, choice in choices.items():
+        print(f'{key}: {choice.desc}')
 
     selection = input('>> ')
     try:
@@ -51,7 +65,8 @@ while game_on:
     except:
         print(f'Chose {selection}. That is not a valid selection')
     else:
-        print(player.act(choice))
+        print(choice.act())
+        print('\n\n')
 
 
 # * Prints the current room name

@@ -1,3 +1,5 @@
+from functools import partial
+from action import Action
 # Write a class to hold player information, e.g. what room they are in
 # currently.
 
@@ -7,7 +9,7 @@ class Player:
         self.name = name
         self.loc = loc
 
-    def act(self, dir):
+    def move(self, dir):
         target = getattr(self.loc, dir)
         if target:
             self.loc = target
@@ -25,6 +27,7 @@ class Player:
         for key, dir in choices:
             room = getattr(loc, dir)
             if room:
-                choice_interface[key] = dir
-                print(f'{key}: {room.name}')
+                desc = f'Move to {room.name}'
+                act = partial(self.move, dir)
+                choice_interface[key] = Action(key=key, act=act, desc=desc)
         return choice_interface
