@@ -29,6 +29,11 @@ class Player:
         self.loc.contents.remove(item)
         return f'Picked up {item.name}'
 
+    def use_up(self, item):
+        self.inventory.remove(item)
+        if item.original_life != 1:
+            return f'You used up {item.name}'
+
     def look(self):
         contents = self.loc.contents
         if not contents:
@@ -63,6 +68,40 @@ class Player:
                             act=self.clear_situation)
             self.current_situation.add_choice(cancel)
 
+    def check_inventory(self):
+        inventory = self.inventory
+        if not inventory:
+            string = "Your pack is empty."
+            self.clear_situation()
+            return string
+        else:
+            # generates specific use actions for different items, gets
+            # bound in loop below
+            def use(item):
+                result = item.use(self) + '\n'
+                result += self.check_inventory() or ''
+                return result
+
+            string = 'Checking your pack, you find: \n'
+            choices = OrderedDict()
+            # loop creates a Action for each item around, adds these items
+            # to a Situation, and sets Players current state to that situation
+            for index, item in enumerate(inventory):
+                num = str(index + 1)
+                string += ' ' * 10
+                string += f'{num}. {item.desc}\n'
+                choices[num] = Action(
+                    key=num,
+                    desc=f'{item.verb} {item.name}',
+                    act=partial(use, item=item)
+                )
+
+            # Adds cancellation of 'look' situation to return to generic staet
+            self.current_situation = Situation(desc=string, choices=choices)
+            cancel = Action(key='c', desc="Close pack.",
+                            act=self.clear_situation)
+            self.current_situation.add_choice(cancel)
+
     def clear_situation(self):
         # clears out any special situation the Player might be in
         self.current_situation = None
@@ -89,6 +128,10 @@ class Player:
 
             look = Action(key='l', desc='Look around', act=self.look)
             situation.add_choice(look)
+
+            check_inventory = Action(
+                key='p', desc="Check pack", act=self.check_inventory)
+            situation.add_choice(check_inventory)
             return situation
         else:
             return self.current_situation
