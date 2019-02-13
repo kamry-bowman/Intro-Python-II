@@ -56,28 +56,23 @@ def end_game():
 quit = Action(key='q', desc='End game', act=end_game)
 
 while game_on:
+    # get current situation for player
     situation = player.situation()
+    # add quite choice to situation's choices
     situation.add_choice(quit)
 
+    # get description of current situation
     print(situation.announce())
     selection = input('>> ')
     try:
+        # use input to attempt to access an Action from situation's
+        # choices
         choice = situation.choices[selection]
     except:
         print(f'Chose {selection}. That is not a valid selection')
     else:
+        # if valid action found, undertake action
         result = choice.act()
         if result:
             print(result)
             print('\n\n')
-
-
-# * Prints the current room name
-# * Prints the current description (the textwrap module might be useful here).
-# * Waits for user input and decides what to do.
-
-
-# If the user enters a cardinal direction, attempt to move to the room there.
-# Print an error message if the movement isn't allowed.
-#
-# If the user enters "q", quit the game.

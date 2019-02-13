@@ -36,6 +36,8 @@ class Player:
             self.clear_situation()
             return string
         else:
+            # generates specific pickup actions for different items, gets
+            # bound in loop below
             def pickup(item):
                 result = self.take(item) + '\n'
                 result += self.look() or ''
@@ -43,6 +45,8 @@ class Player:
 
             string = 'Looking around, you notice the following: \n'
             choices = OrderedDict()
+            # loop creates a Action for each item around, adds these items
+            # to a Situation, and sets Players current state to that situation
             for index, item in enumerate(contents):
                 num = str(index + 1)
                 string += ' ' * 10
@@ -53,15 +57,19 @@ class Player:
                     act=partial(pickup, item=item)
                 )
 
+            # Adds cancellation of 'look' situation to return to generic staet
             self.current_situation = Situation(desc=string, choices=choices)
             cancel = Action(key='c', desc="Don't touch anything.",
                             act=self.clear_situation)
             self.current_situation.add_choice(cancel)
 
     def clear_situation(self):
+        # clears out any special situation the Player might be in
         self.current_situation = None
 
     def situation(self):
+        # checks to see if the player is in a special situation needing to
+        # be resolved
         if not self.current_situation:
             loc = self.loc
             desc = f'Location: {loc.name}\n{loc.desc}'
@@ -71,6 +79,7 @@ class Player:
             choices = [('n', 'north'), ('e', 'east'),
                        ('s', 'south'), ('w', 'west')]
 
+            # builds up a set of movement Actions for each direction
             for key, dir in choices:
                 room = getattr(loc, dir)
                 if room:
@@ -97,6 +106,7 @@ class Situation:
             self.choices[choice.key] = choice
 
     def announce(self):
+        # the announce method is used by the adv.py to describe the situation
         str = ''
         str += self.desc + '\n'
         str += 'Choices:\n'
