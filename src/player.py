@@ -7,6 +7,8 @@ from item import Item, LightSource
 # Write a class to hold player information, e.g. what room they are in
 # currently.
 
+# helper func to grab first item matching predicate from iterable
+
 
 def pick(predicate, content):
     eligible = [thing for thing in content if predicate(thing)]
@@ -158,7 +160,10 @@ class Player:
     def render(self):
         # checks to see if the player is in a special situation needing to
         # be resolved
-        if not self.current_state:
+        if self.current_state:
+            return self.current_state()
+        # otherwise returns the basic survey the area state
+        else:
             loc = self.loc
             if self.sufficient_light():
                 desc = f'Location: {loc.name}\n{loc.desc}'
@@ -189,9 +194,8 @@ class Player:
             situation.add_choice(check_inventory)
             return situation
 
-        else:
-            return self.current_state()
-
+    # updates player into special states (which are themselves functions
+    # that return Situations to adv.py)
     def update_state(self, transition):
         self.current_state = getattr(self, transition, lambda x: None)
         return self.current_state()
