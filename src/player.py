@@ -1,4 +1,6 @@
 from functools import partial
+import textwrap
+
 from collections import OrderedDict
 from action import Action
 
@@ -7,11 +9,17 @@ from item import Item
 # currently.
 
 
+def pick(item, content):
+    if isinstance(item, str):
+        eligible = [thing for thing in content if thing.name == item]
+        return eligible[0] if eligible else None
+
+
 class Player:
     def __init__(self, name, loc):
         self.name = name
         self.loc = loc
-        self.current_situation = None
+        self.current_state = None
         self.inventory = []
 
     def move(self, dir):
@@ -23,6 +31,12 @@ class Player:
             return False
 
     def take(self, item):
+        if isinstance(item, str):
+            found_item = pick(item, self.loc.contents)
+            if not found_item:
+                return f'{item} is not something you can use.'
+            else:
+                item = found_item
         if not isinstance(item, Item):
             raise Exception('Can only take items')
         self.inventory.append(item)
@@ -34,23 +48,33 @@ class Player:
         if item.original_life != 1:
             return f'You used up {item.name}'
 
+    def drop(self, item):
+        if isinstance(item, str):
+            found_item = pick(item, self.inventory)
+            if not found_item:
+                return f'{item} is not something you can drop'
+            else:
+                item = found_item
+        if not isinstance(item, Item):
+            raise Exception('Can only drop items')
+        self.inventory.remove(item)
+        return f'You dropped {item}'
+
     def look(self):
         contents = self.loc.contents
         if not contents:
-            string = "You don't see anything of interest."
-            self.clear_situation()
-            return string
+            self.clear_state()
+            return 'You do not see anything of interest.\n'
         else:
             # generates specific pickup actions for different items, gets
             # bound in loop below
             def pickup(item):
                 result = self.take(item) + '\n'
-                result += self.look() or ''
                 return result
 
             string = 'Looking around, you notice the following: \n'
             choices = OrderedDict()
-            # loop creates a Action for each item around, adds these items
+            # loop creates a return Action for each item around, adds these items
             # to a Situation, and sets Players current state to that situation
             for index, item in enumerate(contents):
                 num = str(index + 1)
@@ -63,25 +87,32 @@ class Player:
                 )
 
             # Adds cancellation of 'look' situation to return to generic staet
-            self.current_situation = Situation(desc=string, choices=choices)
+            situation = Situation(desc=string, choices=choices)
             cancel = Action(key='c', desc="Don't touch anything.",
-                            act=self.clear_situation)
-            self.current_situation.add_choice(cancel)
+                            act=self.clear_state)
+            situation.add_choice(cancel)
+            return situation
+
+    def use(self, item):
+        if isinstance(item, str):
+            found_item = pick(item, self.inventory)
+            if not found_item:
+                return f'{item} is not something you can use.'
+            else:
+                item = found_item
+        if not isinstance(item, Item):
+            raise Exception('Can only use items')
+
+        result = item.use(self) + '\n'
+        return result
 
     def check_inventory(self):
         inventory = self.inventory
         if not inventory:
-            string = "Your pack is empty."
-            self.clear_situation()
+            string = "Your inventory is empty."
+            self.clear_state()
             return string
         else:
-            # generates specific use actions for different items, gets
-            # bound in loop below
-            def use(item):
-                result = item.use(self) + '\n'
-                result += self.check_inventory() or ''
-                return result
-
             string = 'Checking your pack, you find: \n'
             choices = OrderedDict()
             # loop creates a Action for each item around, adds these items
@@ -93,23 +124,25 @@ class Player:
                 choices[num] = Action(
                     key=num,
                     desc=f'{item.verb} {item.name}',
-                    act=partial(use, item=item)
+                    act=partial(self.use, item=item)
                 )
 
             # Adds cancellation of 'look' situation to return to generic staet
-            self.current_situation = Situation(desc=string, choices=choices)
+            situation = Situation(desc=string, choices=choices)
+
             cancel = Action(key='c', desc="Close pack.",
-                            act=self.clear_situation)
-            self.current_situation.add_choice(cancel)
+                            act=self.clear_state)
+            situation.add_choice(cancel)
+            return situation
 
-    def clear_situation(self):
+    def clear_state(self):
         # clears out any special situation the Player might be in
-        self.current_situation = None
+        self.current_state = None
 
-    def situation(self):
+    def render(self):
         # checks to see if the player is in a special situation needing to
         # be resolved
-        if not self.current_situation:
+        if not self.current_state:
             loc = self.loc
             desc = f'Location: {loc.name}\n{loc.desc}'
 
@@ -126,15 +159,23 @@ class Player:
                     act = partial(self.move, dir)
                     situation.add_choice(Action(key=key, act=act, desc=desc))
 
-            look = Action(key='l', desc='Look around', act=self.look)
+            look = Action(key='l', desc='Look around',
+                          act=lambda: self.update_state('look'))
             situation.add_choice(look)
 
             check_inventory = Action(
-                key='p', desc="Check pack", act=self.check_inventory)
+                key='i',
+                desc="Check inventory",
+                act=lambda: self.update_state('check_inventory'))
             situation.add_choice(check_inventory)
             return situation
+
         else:
-            return self.current_situation
+            return self.current_state()
+
+    def update_state(self, transition):
+        self.current_state = getattr(self, transition, lambda x: None)
+        return self.current_state()
 
 
 class Situation:
@@ -150,11 +191,13 @@ class Situation:
 
     def announce(self):
         # the announce method is used by the adv.py to describe the situation
+        wrapper = textwrap.TextWrapper()
         str = ''
-        str += self.desc + '\n'
+        str += wrapper.fill(self.desc) + '\n\n'
         str += 'Choices:\n'
 
-        for key, choice in self.choices.items():
-            str += (f'{key}: {choice.desc}\n')
+        for key in self.choices:
+
+            str += '     ' + self.choices[key].announce()
 
         return str

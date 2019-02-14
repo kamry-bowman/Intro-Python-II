@@ -1,3 +1,5 @@
+from functools import partial
+
 from room import Room
 from player import Player
 from action import Action
@@ -56,23 +58,47 @@ def end_game():
 quit = Action(key='q', desc='End game', act=end_game)
 
 while game_on:
-    # get current situation for player
-    situation = player.situation()
-    # add quite choice to situation's choices
-    situation.add_choice(quit)
-
-    # get description of current situation
-    print(situation.announce())
-    selection = input('>> ')
-    try:
-        # use input to attempt to access an Action from situation's
-        # choices
-        choice = situation.choices[selection]
-    except:
-        print(f'Chose {selection}. That is not a valid selection')
+    # get current play state for player
+    situation = player.render()
+    if isinstance(situation, str):
+        print(situation)
     else:
-        # if valid action found, undertake action
-        result = choice.act()
-        if result:
-            print(result)
-            print('\n\n')
+        # add take <item> choice
+        take_specific = Action(key='take', target_string='item',
+                               desc='Pick up <item>', act=player.take)
+        situation.add_choice(take_specific)
+        # add use <item> choice
+        use_specific = Action(key='use', target_string='item',
+                              desc='Use <item>', act=player.use)
+        situation.add_choice(use_specific)
+        # add drop <item> choice
+        drop = Action(key='drop', target_string='item',
+                      desc='Drop <item>', act=player.drop)
+        situation.add_choice(drop)
+        # add quit choice to player's choices
+        situation.add_choice(quit)
+
+        # get description of current state
+        print(situation.announce())
+        user_input = input('>> ').split(' ', 1)
+        selection = user_input[0]
+        argument = user_input[1] if len(user_input) > 1 else None
+
+        try:
+            # use input to attempt to access an Action from situation's
+            # choices
+            choice = situation.choices[selection]
+        except:
+            print(f'Chose {selection}. That is not a valid selection')
+        else:
+            # if valid action found, undertake action
+            # check is the action requires two words, and handle appropriately
+            if choice.target_string:
+                if argument:
+                    result = choice.act(argument)
+                else:
+                    result = f'{choice.desc} requires a target!'
+            else:
+                result = choice.act()
+            if result and isinstance(result, str):
+                print(result + '\n\n')
