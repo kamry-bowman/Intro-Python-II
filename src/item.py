@@ -18,3 +18,14 @@ class Item:
         if self.life == 0:
             string += user.use_up(self) or ''
         return string
+
+    def on_drop(self):
+        pass
+
+
+class LightSource(Item):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def on_drop(self):
+        return "It's not wise to drop your light source."

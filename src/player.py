@@ -1,26 +1,26 @@
 from functools import partial
-import textwrap
 
 from collections import OrderedDict
 from action import Action
 
-from item import Item
+from item import Item, LightSource
 # Write a class to hold player information, e.g. what room they are in
 # currently.
 
 
-def pick(item, content):
-    if isinstance(item, str):
-        eligible = [thing for thing in content if thing.name == item]
-        return eligible[0] if eligible else None
+def pick(predicate, content):
+    eligible = [thing for thing in content if predicate(thing)]
+    return eligible[0] if eligible else None
 
 
 class Player:
-    def __init__(self, name, loc):
+    def __init__(self, name, loc, **kwargs):
         self.name = name
         self.loc = loc
         self.current_state = None
         self.inventory = []
+        self.max_hp = kwargs.get('max_hp') or 10
+        self.hp = self.max_hp
 
     def move(self, dir):
         target = getattr(self.loc, dir)
@@ -31,10 +31,13 @@ class Player:
             return False
 
     def take(self, item):
+        if not self.sufficient_light():
+            self.clear_state()
+            return 'It is too dark to find anything.'
         if isinstance(item, str):
-            found_item = pick(item, self.loc.contents)
+            found_item = pick(lambda x: x.name == item, self.loc.contents)
             if not found_item:
-                return f'{item} is not something you can use.'
+                return f'{item} is not something you can pick up here.'
             else:
                 item = found_item
         if not isinstance(item, Item):
@@ -50,7 +53,7 @@ class Player:
 
     def drop(self, item):
         if isinstance(item, str):
-            found_item = pick(item, self.inventory)
+            found_item = pick(lambda x: x.name == item, self.inventory)
             if not found_item:
                 return f'{item} is not something you can drop'
             else:
@@ -58,9 +61,17 @@ class Player:
         if not isinstance(item, Item):
             raise Exception('Can only drop items')
         self.inventory.remove(item)
-        return f'You dropped {item}'
+        self.loc.contents.append(item)
+        string = f'You dropped {item.name}'
+        result = item.on_drop()
+        if isinstance(result, str):
+            string += '\n' + result
+        return string
 
     def look(self):
+        if not self.sufficient_light():
+            self.clear_state()
+            return 'It is too dark to look around'
         contents = self.loc.contents
         if not contents:
             self.clear_state()
@@ -95,7 +106,7 @@ class Player:
 
     def use(self, item):
         if isinstance(item, str):
-            found_item = pick(item, self.inventory)
+            found_item = pick(lambda x: x.name == item, self.inventory)
             if not found_item:
                 return f'{item} is not something you can use.'
             else:
@@ -135,6 +146,11 @@ class Player:
             situation.add_choice(cancel)
             return situation
 
+    def sufficient_light(self):
+        return bool(self.loc.is_light or pick(
+            lambda x: isinstance(x, LightSource), self.inventory)
+        )
+
     def clear_state(self):
         # clears out any special situation the Player might be in
         self.current_state = None
@@ -144,7 +160,10 @@ class Player:
         # be resolved
         if not self.current_state:
             loc = self.loc
-            desc = f'Location: {loc.name}\n{loc.desc}'
+            if self.sufficient_light():
+                desc = f'Location: {loc.name}\n{loc.desc}'
+            else:
+                desc = f"Location: {loc.name}\nIt's pitch black."
 
             situation = Situation(desc=desc)
 
@@ -191,9 +210,8 @@ class Situation:
 
     def announce(self):
         # the announce method is used by the adv.py to describe the situation
-        wrapper = textwrap.TextWrapper()
         str = ''
-        str += wrapper.fill(self.desc) + '\n\n'
+        str += self.desc + '\n\n'
         str += 'Choices:\n'
 
         for key in self.choices:

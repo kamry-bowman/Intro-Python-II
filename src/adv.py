@@ -3,28 +3,45 @@ from functools import partial
 from room import Room
 from player import Player
 from action import Action
-from item import Item
+from item import Item, LightSource
 
 # Declare all the rooms
 
 room = {
     'outside':  Room("Outside Cave Entrance",
                      "North of you, the cave mount beckons",
-                     [Item('rock'), Item('healing potion')]),
-
-    'foyer':    Room("Foyer", """Dim light filters in from the south. Dusty
-passages run north and east."""),
+                     [
+                         Item(name='rock', verb='throw', verb_past='threw'),
+                         Item('healing potion')
+                     ]
+                     ),
+    'foyer':    Room("Foyer",
+                     """Dim light filters in from the south. Dusty passages run
+                      north and east.""",
+                     contents=[
+                         LightSource(
+                             'torch',
+                             verb='brandish',
+                             verb_past='brandished',
+                             life=-1)
+                     ]
+                     ),
 
     'overlook': Room("Grand Overlook", """A steep cliff appears before you, falling
 into the darkness. Ahead to the north, a light flickers in
-the distance, but there is no way across theuchasm."""),
+the distance, but there is no way across the chasm."""),
 
-    'narrow':   Room("Narrow Passage", """The narrow passage bends here from west
-to north. The smell of gold permeates the air."""),
+    'narrow':   Room(
+        "Narrow Passage",
+        """The narrow passage bends here from west to north. The smell of gold permeates the air.""",
+        is_light=False
+    ),
 
-    'treasure': Room("Treasure Chamber", """You've found the long-lost treasure
-chamber! Sadly, it has already been completely emptied by
-earlier adventurers. The only exit is to the south."""),
+    'treasure': Room(
+        "Treasure Chamber",
+        """You've found the long-lost treasure chamber! Sadly, it has already been completely emptied by
+earlier adventurers. The only exit is to the south.""",
+        is_light=False)
 }
 
 
@@ -60,6 +77,8 @@ quit = Action(key='q', desc='End game', act=end_game)
 while game_on:
     # get current play state for player
     situation = player.render()
+    # some situations are events that immediately resolve. These
+    # are strings and can be immediately printed.
     if isinstance(situation, str):
         print(situation)
     else:
